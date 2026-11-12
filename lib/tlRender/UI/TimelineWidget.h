@@ -152,6 +152,13 @@ namespace tl
             //! Set the frame markers.
             TL_UI_API void setFrameMarkers(const std::vector<int>&);
 
+            //! Mark a time with a thin line down the timelines, e.g. how far
+            //! a sequence has been rendered again. Unset by default; kept
+            //! while the player is the same file, reloaded or not.
+            TL_UI_API void setTimeMark(
+                const std::optional<OTIO_NS::RationalTime>&,
+                const ftk::Color4F&);
+
             ///@}
 
             //! \name Item Colors

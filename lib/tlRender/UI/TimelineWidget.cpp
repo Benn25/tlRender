@@ -47,6 +47,8 @@ namespace tl
             std::shared_ptr<ftk::Observable<std::optional<OTIO_NS::RationalTime> > > timeScrub;
             std::shared_ptr<ftk::Observable<std::optional<OTIO_NS::RationalTime> > > timeHover;
             std::vector<int> frameMarkers;
+            std::optional<OTIO_NS::RationalTime> timeMark;
+            ftk::Color4F timeMarkColor;
             std::vector<Marker> markers;
             std::vector<ItemColors> itemColors;
             std::vector<std::string> labels;
@@ -220,6 +222,17 @@ namespace tl
             if (player == p.player)
                 return;
 
+            // The same sequence reloaded -- grown, its frame range with it --
+            // keeps its mark.
+            const auto pathKey = [](const std::shared_ptr<Player>& value)
+            {
+                const ftk::Path& path = value->getPath();
+                return path.getDir() + path.getBase() + path.getExt();
+            };
+            if (!player || !p.player || pathKey(player) != pathKey(p.player))
+            {
+                p.timeMark.reset();
+            }
             p.timeRange = OTIO_NS::TimeRange();
             p.playback = Playback::Stop;
             p.playbackObserver.reset();
@@ -497,6 +510,18 @@ namespace tl
             p.ruler->setFrameMarkers(value);
         }
 
+        void TimelineWidget::setTimeMark(
+            const std::optional<OTIO_NS::RationalTime>& value,
+            const ftk::Color4F& color)
+        {
+            FTK_P();
+            if (value == p.timeMark && color == p.timeMarkColor)
+                return;
+            p.timeMark = value;
+            p.timeMarkColor = color;
+            setDrawUpdate();
+        }
+
         const std::vector<Marker>& TimelineWidget::getMarkers() const
         {
             return _p->markers;
@@ -750,6 +775,16 @@ namespace tl
             // same instant marked down the stack is what says where the
             // versions are being compared.
             const ftk::Box2I& g = p.scrollWidget->getGeometry();
+            if (p.timeMark.has_value())
+            {
+                const int x = p.ruler->timeToPos(p.timeMark.value());
+                if (x >= g.min.x && x <= g.max.x)
+                {
+                    event.render->drawRect(
+                        ftk::Box2I(x, g.min.y, p.border, g.h()),
+                        p.timeMarkColor);
+                }
+            }
             const int x = p.ruler->timeToPos(p.currentTime);
             if (x >= g.min.x && x <= g.max.x)
             {
