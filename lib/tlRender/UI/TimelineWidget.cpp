@@ -778,11 +778,17 @@ namespace tl
             if (p.timeMark.has_value())
             {
                 const int x = p.ruler->timeToPos(p.timeMark.value());
-                if (x >= g.min.x && x <= g.max.x)
+                for (int i = 0; i < 10; ++i)
                 {
-                    event.render->drawRect(
-                        ftk::Box2I(x, g.min.y, p.border, g.h()),
-                        p.timeMarkColor);
+                    const int xi = x + i * p.border;
+                    if (xi >= g.min.x && xi <= g.max.x)
+                    {
+                        ftk::Color4F color = p.timeMarkColor;
+                        color.a *= 1.F - i / 10.F;
+                        event.render->drawRect(
+                            ftk::Box2I(xi, g.min.y, p.border, g.h()),
+                            color);
+                    }
                 }
             }
             const int x = p.ruler->timeToPos(p.currentTime);
