@@ -47,7 +47,7 @@ namespace tl
             std::shared_ptr<ftk::Observable<std::optional<OTIO_NS::RationalTime> > > timeScrub;
             std::shared_ptr<ftk::Observable<std::optional<OTIO_NS::RationalTime> > > timeHover;
             std::vector<int> frameMarkers;
-            std::optional<OTIO_NS::RationalTime> timeMark;
+            std::vector<OTIO_NS::RationalTime> timeMarks;
             ftk::Color4F timeMarkColor;
             std::vector<Marker> markers;
             std::vector<ItemColors> itemColors;
@@ -231,7 +231,7 @@ namespace tl
             };
             if (!player || !p.player || pathKey(player) != pathKey(p.player))
             {
-                p.timeMark.reset();
+                p.timeMarks.clear();
             }
             p.timeRange = OTIO_NS::TimeRange();
             p.playback = Playback::Stop;
@@ -510,14 +510,14 @@ namespace tl
             p.ruler->setFrameMarkers(value);
         }
 
-        void TimelineWidget::setTimeMark(
-            const std::optional<OTIO_NS::RationalTime>& value,
+        void TimelineWidget::setTimeMarks(
+            const std::vector<OTIO_NS::RationalTime>& value,
             const ftk::Color4F& color)
         {
             FTK_P();
-            if (value == p.timeMark && color == p.timeMarkColor)
+            if (value == p.timeMarks && color == p.timeMarkColor)
                 return;
-            p.timeMark = value;
+            p.timeMarks = value;
             p.timeMarkColor = color;
             setDrawUpdate();
         }
@@ -775,9 +775,9 @@ namespace tl
             // same instant marked down the stack is what says where the
             // versions are being compared.
             const ftk::Box2I& g = p.scrollWidget->getGeometry();
-            if (p.timeMark.has_value())
+            for (const auto& timeMark : p.timeMarks)
             {
-                const int x = p.ruler->timeToPos(p.timeMark.value());
+                const int x = p.ruler->timeToPos(timeMark);
                 for (int i = 0; i < 10; ++i)
                 {
                     const int xi = x + i * p.border;
