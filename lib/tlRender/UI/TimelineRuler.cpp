@@ -47,6 +47,7 @@ namespace tl
         {
             std::shared_ptr<ItemData> data;
             std::shared_ptr<Player> player;
+            std::optional<ftk::Color4F> videoCacheColor;
             OTIO_NS::TimeRange timeRange;
             double scale = 500.0;
             OTIO_NS::RationalTime offset;
@@ -242,6 +243,15 @@ namespace tl
             if (value == p.displayOptions)
                 return;
             p.displayOptions = value;
+            setDrawUpdate();
+        }
+
+        void TimelineRuler::setVideoCacheColor(const std::optional<ftk::Color4F>& value)
+        {
+            FTK_P();
+            if (value == p.videoCacheColor)
+                return;
+            p.videoCacheColor = value;
             setDrawUpdate();
         }
 
@@ -709,7 +719,9 @@ namespace tl
                 }
                 if (!mesh.v.empty())
                 {
-                    event.render->drawMesh(mesh, ftk::Color4F(.2F, .4F, .4F));
+                    event.render->drawMesh(
+                        mesh,
+                        p.videoCacheColor.value_or(ftk::Color4F(.2F, .4F, .4F)));
                 }
             }
 

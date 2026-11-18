@@ -230,6 +230,10 @@ namespace tl
             //! Set the display options.
             TL_UI_API void setDisplayOptions(const DisplayOptions&);
 
+            //! Set the color of the video cache; unset for the usual one.
+            //! E.g. a cache kept smaller than usual, to catch the eye.
+            TL_UI_API void setVideoCacheColor(const std::optional<ftk::Color4F>&);
+
             //! Ask for the thumbnails and the waveforms again; see
             //! TimelineItem::refreshMedia().
             TL_UI_API void refreshMedia();

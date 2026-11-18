@@ -670,6 +670,11 @@ namespace tl
             return _p->displayOptions;
         }
 
+        void TimelineWidget::setVideoCacheColor(const std::optional<ftk::Color4F>& value)
+        {
+            _p->ruler->setVideoCacheColor(value);
+        }
+
         void TimelineWidget::setDisplayOptions(const DisplayOptions& value)
         {
             FTK_P();

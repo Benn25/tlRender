@@ -70,6 +70,9 @@ namespace tl
             //! Set the display options.
             TL_UI_API void setDisplayOptions(const DisplayOptions&);
 
+            //! Set the color of the video cache; unset for the usual one.
+            TL_UI_API void setVideoCacheColor(const std::optional<ftk::Color4F>&);
+
             //! Set the options.
             TL_UI_API void setOptions(const ItemOptions&);
 
