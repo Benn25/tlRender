@@ -10,6 +10,15 @@ namespace tl
 {
     namespace ui
     {
+        //! A time marked down the timelines, in its color.
+        struct TL_UI_API_TYPE TimeMark
+        {
+            OTIO_NS::RationalTime time;
+            ftk::Color4F color;
+
+            bool operator == (const TimeMark&) const = default;
+        };
+
         //! Timeline widget.
         class TL_UI_API_TYPE TimelineWidget : public ftk::IWidget
         {
@@ -161,9 +170,7 @@ namespace tl
             //! the right over ten more, e.g. how far each part of a sequence
             //! rendered again has got. None by default; kept while the player
             //! is the same file, reloaded or not.
-            TL_UI_API void setTimeMarks(
-                const std::vector<OTIO_NS::RationalTime>&,
-                const ftk::Color4F&);
+            TL_UI_API void setTimeMarks(const std::vector<TimeMark>&);
 
             ///@}
 

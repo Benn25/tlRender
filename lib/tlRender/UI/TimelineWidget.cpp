@@ -49,8 +49,7 @@ namespace tl
             std::shared_ptr<ftk::Observable<std::optional<OTIO_NS::RationalTime> > > timeScrub;
             std::shared_ptr<ftk::Observable<std::optional<OTIO_NS::RationalTime> > > timeHover;
             std::vector<int> frameMarkers;
-            std::vector<OTIO_NS::RationalTime> timeMarks;
-            ftk::Color4F timeMarkColor;
+            std::vector<TimeMark> timeMarks;
             std::vector<Marker> markers;
             std::vector<ItemColors> itemColors;
             std::vector<std::string> labels;
@@ -528,15 +527,12 @@ namespace tl
             p.ruler->setFrameMarkers(value);
         }
 
-        void TimelineWidget::setTimeMarks(
-            const std::vector<OTIO_NS::RationalTime>& value,
-            const ftk::Color4F& color)
+        void TimelineWidget::setTimeMarks(const std::vector<TimeMark>& value)
         {
             FTK_P();
-            if (value == p.timeMarks && color == p.timeMarkColor)
+            if (value == p.timeMarks)
                 return;
             p.timeMarks = value;
-            p.timeMarkColor = color;
             setDrawUpdate();
         }
 
@@ -846,13 +842,13 @@ namespace tl
             }
             for (const auto& timeMark : p.timeMarks)
             {
-                const int x = p.ruler->timeToPos(timeMark);
+                const int x = p.ruler->timeToPos(timeMark.time);
                 for (int i = 0; i < 10; ++i)
                 {
                     const int xi = x + i * p.border;
                     if (xi >= g.min.x && xi <= g.max.x)
                     {
-                        ftk::Color4F color = p.timeMarkColor;
+                        ftk::Color4F color = timeMark.color;
                         color.a *= 1.F - i / 10.F;
                         event.render->drawRect(
                             ftk::Box2I(xi, g.min.y, p.border, g.h()),
