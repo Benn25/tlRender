@@ -152,6 +152,11 @@ namespace tl
             //! Set the frame markers.
             TL_UI_API void setFrameMarkers(const std::vector<int>&);
 
+            // The in/out range is set on the timeline itself, as an A-B
+            // loop: Shift and a drag with the left button marks it, a press
+            // on either bracket drags that end, and Shift and a click
+            // without a drag clears it. Outside it the timeline is faded.
+
             //! Mark times with lines down the timelines, each fading out to
             //! the right over ten more, e.g. how far each part of a sequence
             //! rendered again has got. None by default; kept while the player
@@ -267,6 +272,8 @@ namespace tl
                 const std::shared_ptr<Timeline>&) const;
 
             double _getDuration() const;
+            //! The frame under a position, in the time range.
+            OTIO_NS::RationalTime _frameAt(int) const;
             double _getTimelineScale() const;
             double _getTimelineScaleMax() const;
 

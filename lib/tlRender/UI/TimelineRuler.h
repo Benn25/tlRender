@@ -92,6 +92,9 @@ namespace tl
             //! Convert a time to a position.
             TL_UI_API int timeToPos(const OTIO_NS::RationalTime&) const;
 
+            //! Convert a position to a time, kept in the time range.
+            TL_UI_API OTIO_NS::RationalTime posToTime(float) const;
+
             TL_UI_API ftk::Size2I getSizeHint() const override;
             TL_UI_API void sizeHintEvent(const ftk::SizeHintEvent&) override;
             TL_UI_API void drawEvent(const ftk::Box2I&, const ftk::DrawEvent&) override;

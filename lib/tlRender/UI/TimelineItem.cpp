@@ -3,6 +3,7 @@
 
 #include <tlRender/UI/TimelineItemPrivate.h>
 
+#include <tlRender/Core/Time.h>
 #include <tlRender/Timeline/IRender.h>
 #include <tlRender/Timeline/OTIOVersion.h>
 #include <tlRender/Timeline/Util.h>
@@ -922,8 +923,22 @@ namespace tl
 
         void TimelineItem::mousePressEvent(ftk::MouseClickEvent& event)
         {
-            IMouseWidget::mousePressEvent(event);
             FTK_P();
+            // A press on a bracket of the in/out range is the timeline
+            // widget's, to drag it, rather than a seek.
+            if (ftk::MouseButton::Left == event.button &&
+                0 == event.modifiers &&
+                p.inOutRange.has_value() &&
+                !compareExact(p.inOutRange.value(), _timeRange))
+            {
+                const int grab = p.size.border * 5;
+                if (std::abs(event.pos.x - timeToPos(p.inOutRange->start_time())) <= grab ||
+                    std::abs(event.pos.x - timeToPos(p.inOutRange->end_time_exclusive())) <= grab)
+                {
+                    return;
+                }
+            }
+            IMouseWidget::mousePressEvent(event);
             takeKeyFocus();
             if (p.player &&
                 _options.inputEnabled &&

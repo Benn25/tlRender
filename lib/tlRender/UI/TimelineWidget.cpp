@@ -5,6 +5,8 @@
 
 #include <tlRender/UI/TimelineRuler.h>
 
+#include <tlRender/Core/Time.h>
+
 #include <tlRender/Timeline/TimeUnits.h>
 
 #include <ftk/UI/RowLayout.h>
@@ -83,7 +85,10 @@ namespace tl
             enum class MouseMode
             {
                 None,
-                Scroll
+                Scroll,
+                InOutSet,
+                InOutStart,
+                InOutEnd
             };
             struct MouseData
             {
@@ -91,11 +96,15 @@ namespace tl
                 ftk::V2I press;
                 MouseMode mode = MouseMode::None;
                 ftk::V2I scrollPos;
+                OTIO_NS::RationalTime inOutAnchor;
+                bool inOutDragged = false;
             };
             MouseData mouse;
 
             std::shared_ptr<ftk::Observer<Playback> > playbackObserver;
             std::shared_ptr<ftk::Observer<OTIO_NS::RationalTime> > currentTimeObserver;
+            OTIO_NS::TimeRange inOutRange;
+            std::shared_ptr<ftk::Observer<OTIO_NS::TimeRange> > inOutRangeObserver;
             std::shared_ptr<ftk::Observer<std::string> > mediaReferenceKeyObserver;
             std::shared_ptr<ftk::ListObserver<std::shared_ptr<Timeline> > > compareObserver;
             std::shared_ptr<ftk::Observer<bool> > scrubObserver;
@@ -237,6 +246,7 @@ namespace tl
             p.playback = Playback::Stop;
             p.playbackObserver.reset();
             p.currentTimeObserver.reset();
+            p.inOutRangeObserver.reset();
             p.mediaReferenceKeyObserver.reset();
             p.compareObserver.reset();
 
@@ -249,6 +259,14 @@ namespace tl
             if (p.player)
             {
                 p.timeRange = p.player->getTimeRange();
+
+                p.inOutRangeObserver = ftk::Observer<OTIO_NS::TimeRange>::create(
+                    p.player->observeInOutRange(),
+                    [this](const OTIO_NS::TimeRange& value)
+                    {
+                        _p->inOutRange = value;
+                        setDrawUpdate();
+                    });
 
                 // The compare timelines are drawn beside the player's own, so
                 // the items are rebuilt when the set changes.
@@ -780,6 +798,52 @@ namespace tl
             // same instant marked down the stack is what says where the
             // versions are being compared.
             const ftk::Box2I& g = p.scrollWidget->getGeometry();
+            if (!compareExact(p.inOutRange, p.timeRange) && p.inOutRange.duration().value() > 0.0)
+            {
+                // Outside, faded towards the background: left out of
+                // playback.
+                const int x0 = p.ruler->timeToPos(p.inOutRange.start_time());
+                const int x1 = p.ruler->timeToPos(p.inOutRange.end_time_exclusive());
+                ftk::Color4F fade = event.style->getColorRole(ftk::ColorRole::Window);
+                fade.a = .6F;
+                if (x0 > g.min.x)
+                {
+                    event.render->drawRect(
+                        ftk::Box2I(g.min.x, g.min.y, std::min(x0, g.max.x + 1) - g.min.x, g.h()),
+                        fade);
+                }
+                if (x1 <= g.max.x)
+                {
+                    const int xs = std::max(x1, g.min.x);
+                    event.render->drawRect(
+                        ftk::Box2I(xs, g.min.y, g.max.x + 1 - xs, g.h()),
+                        fade);
+                }
+                // The brackets, each fading inwards over ten lines as the
+                // refresh marks do, with a foot at the top and the bottom.
+                const ftk::Color4F bracket(.35F, .6F, 1.F);
+                for (int i = 0; i < 10; ++i)
+                {
+                    ftk::Color4F color = bracket;
+                    color.a = 1.F - i / 10.F;
+                    const int xa = x0 + i * p.border;
+                    if (xa >= g.min.x && xa <= g.max.x)
+                    {
+                        event.render->drawRect(ftk::Box2I(xa, g.min.y, p.border, g.h()), color);
+                    }
+                    const int xb = x1 - p.border - i * p.border;
+                    if (xb >= g.min.x && xb <= g.max.x)
+                    {
+                        event.render->drawRect(ftk::Box2I(xb, g.min.y, p.border, g.h()), color);
+                    }
+                }
+                const int foot = p.border * 6;
+                const int footH = p.border * 2;
+                event.render->drawRect(ftk::Box2I(x0, g.min.y, foot, footH), bracket);
+                event.render->drawRect(ftk::Box2I(x0, g.max.y + 1 - footH, foot, footH), bracket);
+                event.render->drawRect(ftk::Box2I(x1 - foot, g.min.y, foot, footH), bracket);
+                event.render->drawRect(ftk::Box2I(x1 - foot, g.max.y + 1 - footH, foot, footH), bracket);
+            }
             for (const auto& timeMark : p.timeMarks)
             {
                 const int x = p.ruler->timeToPos(timeMark);
@@ -818,6 +882,16 @@ namespace tl
             p.mouse.inside = false;
         }
 
+        OTIO_NS::RationalTime TimelineWidget::_frameAt(int x) const
+        {
+            FTK_P();
+            const double rate = p.timeRange.duration().rate();
+            return ftk::clamp(
+                p.ruler->posToTime(x).rescaled_to(rate).floor(),
+                p.timeRange.start_time().rescaled_to(rate),
+                p.timeRange.end_time_inclusive().rescaled_to(rate));
+        }
+
         void TimelineWidget::mouseMoveEvent(ftk::MouseMoveEvent& event)
         {
             FTK_P();
@@ -829,6 +903,39 @@ namespace tl
                 const ftk::V2I d = event.pos - p.mouse.press;
                 p.scrollWidget->setScrollPos(p.mouse.scrollPos - d);
                 setFrameView(false);
+                break;
+            }
+            case Private::MouseMode::InOutSet:
+            {
+                event.accept = true;
+                if (!p.mouse.inOutDragged &&
+                    std::abs(event.pos.x - p.mouse.press.x) > p.border * 3)
+                {
+                    p.mouse.inOutDragged = true;
+                }
+                if (p.mouse.inOutDragged && p.player)
+                {
+                    const OTIO_NS::RationalTime t = _frameAt(event.pos.x);
+                    p.player->setInOutRange(OTIO_NS::TimeRange::range_from_start_end_time_inclusive(
+                        std::min(t, p.mouse.inOutAnchor),
+                        std::max(t, p.mouse.inOutAnchor)));
+                }
+                break;
+            }
+            case Private::MouseMode::InOutStart:
+            case Private::MouseMode::InOutEnd:
+            {
+                event.accept = true;
+                if (p.player)
+                {
+                    const OTIO_NS::RationalTime t = _frameAt(event.pos.x);
+                    const OTIO_NS::RationalTime start = p.inOutRange.start_time();
+                    const OTIO_NS::RationalTime end = p.inOutRange.end_time_inclusive();
+                    p.player->setInOutRange(
+                        Private::MouseMode::InOutStart == p.mouse.mode ?
+                        OTIO_NS::TimeRange::range_from_start_end_time_inclusive(std::min(t, end), end) :
+                        OTIO_NS::TimeRange::range_from_start_end_time_inclusive(start, std::max(t, start)));
+                }
                 break;
             }
             default: break;
@@ -850,6 +957,37 @@ namespace tl
                 p.mouse.mode = Private::MouseMode::Scroll;
                 p.mouse.scrollPos = p.scrollWidget->getScrollPos();
             }
+            else if (p.itemOptions->get().inputEnabled &&
+                p.player &&
+                ftk::MouseButton::Left == event.button &&
+                static_cast<int>(ftk::KeyModifier::Shift) == event.modifiers)
+            {
+                // Shift and the left button: an A-B range, from here.
+                event.accept = true;
+                p.mouse.mode = Private::MouseMode::InOutSet;
+                p.mouse.inOutAnchor = _frameAt(event.pos.x);
+                p.mouse.inOutDragged = false;
+            }
+            else if (p.itemOptions->get().inputEnabled &&
+                p.player &&
+                ftk::MouseButton::Left == event.button &&
+                0 == event.modifiers &&
+                !compareExact(p.inOutRange, p.timeRange))
+            {
+                // A bracket, left to here by the tracks and the ruler: the
+                // nearer of the two.
+                p.mouse.mode = Private::MouseMode::None;
+                const int grab = p.border * 5;
+                const int d0 = std::abs(event.pos.x - p.ruler->timeToPos(p.inOutRange.start_time()));
+                const int d1 = std::abs(event.pos.x - p.ruler->timeToPos(p.inOutRange.end_time_exclusive()));
+                if (std::min(d0, d1) <= grab)
+                {
+                    event.accept = true;
+                    p.mouse.mode = d0 <= d1 ?
+                        Private::MouseMode::InOutStart :
+                        Private::MouseMode::InOutEnd;
+                }
+            }
             else
             {
                 p.mouse.mode = Private::MouseMode::None;
@@ -864,6 +1002,14 @@ namespace tl
             {
                 // The first finger of a gesture was not scrolling.
                 p.scrollWidget->setScrollPos(p.mouse.scrollPos);
+            }
+            // Shift and a click without a drag: the whole timeline again.
+            if (Private::MouseMode::InOutSet == p.mouse.mode &&
+                !p.mouse.inOutDragged &&
+                !event.cancel &&
+                p.player)
+            {
+                p.player->setInOutRange(p.timeRange);
             }
             p.mouse.mode = Private::MouseMode::None;
         }

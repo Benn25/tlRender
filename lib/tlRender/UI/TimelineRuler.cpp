@@ -308,8 +308,22 @@ namespace tl
 
         void TimelineRuler::mousePressEvent(ftk::MouseClickEvent& event)
         {
-            IMouseWidget::mousePressEvent(event);
             FTK_P();
+            // A press on a bracket of the in/out range is the timeline
+            // widget's, to drag it, rather than a seek.
+            if (ftk::MouseButton::Left == event.button &&
+                0 == event.modifiers &&
+                p.inOutRange.has_value() &&
+                !compareExact(p.inOutRange.value(), p.timeRange))
+            {
+                const int grab = p.size.border * 5;
+                if (std::abs(event.pos.x - timeToPos(p.inOutRange->start_time())) <= grab ||
+                    std::abs(event.pos.x - timeToPos(p.inOutRange->end_time_exclusive())) <= grab)
+                {
+                    return;
+                }
+            }
+            IMouseWidget::mousePressEvent(event);
             takeKeyFocus();
             if (p.player &&
                 p.options.inputEnabled &&
@@ -373,6 +387,11 @@ namespace tl
                 _posToTime(value),
                 p.timeRange.start_time(),
                 p.timeRange.end_time_inclusive());
+        }
+
+        OTIO_NS::RationalTime TimelineRuler::posToTime(float value) const
+        {
+            return _posToTimeClamped(value);
         }
 
         int TimelineRuler::timeToPos(const OTIO_NS::RationalTime& value) const
