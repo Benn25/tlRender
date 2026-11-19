@@ -35,6 +35,10 @@ namespace tl
         //! Cancel only the video requests outside the cache's range: after
         //! a seek, the ones still in it are frames the cache still wants.
         void pruneRequests();
+        //! Cancel the video requests for these times: their files were
+        //! written over, and what a read in flight gets is the old picture
+        //! or a part written of the new one.
+        void cancelVideoRequests(const std::vector<OTIO_NS::RationalTime>&);
         void clearCache();
         size_t getVideoCacheMax() const;
         size_t getAudioCacheMax() const;

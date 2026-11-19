@@ -1216,6 +1216,13 @@ namespace tl
             {
                 std::unique_lock<std::mutex> lock(p.mutex.mutex);
                 videoCacheRemove.swap(p.mutex.videoCacheRemove);
+                // The frames written over go before the cache is handed
+                // over: handed over first, they went on into the next
+                // player, a sequence reloaded as it grows, as they were.
+                for (const auto& t : videoCacheRemove)
+                {
+                    p.thread.videoCache.erase(t);
+                }
                 if (p.mutex.videoCacheExport)
                 {
                     p.mutex.videoCacheExport = false;
@@ -1224,9 +1231,10 @@ namespace tl
                 }
                 videoCacheImport.swap(p.mutex.videoCacheImport);
             }
-            for (const auto& t : videoCacheRemove)
+            // And the reads of them in flight, which would bring them back.
+            if (!videoCacheRemove.empty())
             {
-                p.thread.videoCache.erase(t);
+                p.cancelVideoRequests(videoCacheRemove);
             }
             for (const auto& i : videoCacheImport)
             {

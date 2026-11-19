@@ -176,6 +176,33 @@ namespace tl
         }
     }
 
+    void Player::Private::cancelVideoRequests(const std::vector<OTIO_NS::RationalTime>& times)
+    {
+        std::vector<std::vector<uint64_t> > ids(1 + thread.state.compare.size());
+        for (const auto& t : times)
+        {
+            const auto i = thread.videoRequests.find(t);
+            if (i == thread.videoRequests.end())
+                continue;
+            for (size_t j = 0; j < i->second.size() && j < ids.size(); ++j)
+            {
+                ids[j].push_back(i->second[j].id);
+            }
+            thread.videoRequests.erase(i);
+        }
+        if (!ids[0].empty())
+        {
+            timeline->cancelRequests(ids[0]);
+        }
+        for (size_t k = 0; k < thread.state.compare.size(); ++k)
+        {
+            if (!ids[k + 1].empty())
+            {
+                thread.state.compare[k]->cancelRequests(ids[k + 1]);
+            }
+        }
+    }
+
     void Player::Private::clearRequests()
     {
         std::vector<std::vector<uint64_t> > ids(1 + thread.state.compare.size());
