@@ -50,6 +50,7 @@ namespace tl
             std::shared_ptr<ftk::Observable<std::optional<OTIO_NS::RationalTime> > > timeHover;
             std::vector<int> frameMarkers;
             std::vector<TimeMark> timeMarks;
+            std::vector<OTIO_NS::TimeRange> holes;
             std::vector<Marker> markers;
             std::vector<ItemColors> itemColors;
             std::vector<std::string> labels;
@@ -240,6 +241,7 @@ namespace tl
             if (!player || !p.player || pathKey(player) != pathKey(p.player))
             {
                 p.timeMarks.clear();
+                p.holes.clear();
             }
             p.timeRange = OTIO_NS::TimeRange();
             p.playback = Playback::Stop;
@@ -527,6 +529,15 @@ namespace tl
             p.ruler->setFrameMarkers(value);
         }
 
+        void TimelineWidget::setHoles(const std::vector<OTIO_NS::TimeRange>& value)
+        {
+            FTK_P();
+            if (value == p.holes)
+                return;
+            p.holes = value;
+            setDrawUpdate();
+        }
+
         void TimelineWidget::setTimeMarks(const std::vector<TimeMark>& value)
         {
             FTK_P();
@@ -794,6 +805,63 @@ namespace tl
             // same instant marked down the stack is what says where the
             // versions are being compared.
             const ftk::Box2I& g = p.scrollWidget->getGeometry();
+            if (!p.holes.empty())
+            {
+                // Under the ruler, over the tracks: dimmed, and striped at
+                // 45 degrees light and dark in turn, one of which stands
+                // out from any picture.
+                const int y0 = std::max(g.min.y, p.ruler->getGeometry().max.y + 1);
+                const int y1 = g.max.y;
+                const int h = y1 - y0 + 1;
+                ftk::Color4F dim = event.style->getColorRole(ftk::ColorRole::Window);
+                dim.a = .35F;
+                const int spacing = std::max(2, p.border * 5);
+                ftk::LineOptions lineOptions;
+                lineOptions.width = std::max(1.F, p.border * 1.5F);
+                std::vector<std::pair<ftk::V2F, ftk::V2F> > light;
+                std::vector<std::pair<ftk::V2F, ftk::V2F> > dark;
+                for (const auto& hole : p.holes)
+                {
+                    const int x0 = std::max(g.min.x, p.ruler->timeToPos(hole.start_time()));
+                    const int x1 = std::min(g.max.x, p.ruler->timeToPos(hole.end_time_exclusive()));
+                    if (x1 <= x0 || h <= 0)
+                        continue;
+                    event.render->drawRect(ftk::Box2I(x0, y0, x1 - x0, h), dim);
+                    // Lines from the bottom left up to the right, clipped
+                    // to the hole; anchored to the timeline, not the hole,
+                    // so they do not crawl as it grows.
+                    const int origin = p.ruler->timeToPos(p.timeRange.start_time());
+                    int k = (x0 - h - origin) / spacing - 1;
+                    for (int xa = origin + k * spacing; xa < x1; xa += spacing, ++k)
+                    {
+                        float ax = static_cast<float>(xa);
+                        float ay = static_cast<float>(y1);
+                        float bx = static_cast<float>(xa + h);
+                        float by = static_cast<float>(y0);
+                        if (ax < x0)
+                        {
+                            ay -= x0 - ax;
+                            ax = static_cast<float>(x0);
+                        }
+                        if (bx > x1)
+                        {
+                            by += bx - x1;
+                            bx = static_cast<float>(x1);
+                        }
+                        if (bx <= ax)
+                            continue;
+                        (k % 2 ? light : dark).push_back({ ftk::V2F(ax, ay), ftk::V2F(bx, by) });
+                    }
+                }
+                if (!light.empty())
+                {
+                    event.render->drawLines(light, ftk::Color4F(1.F, 1.F, 1.F, .55F), lineOptions);
+                }
+                if (!dark.empty())
+                {
+                    event.render->drawLines(dark, ftk::Color4F(0.F, 0.F, 0.F, .65F), lineOptions);
+                }
+            }
             if (!compareExact(p.inOutRange, p.timeRange) && p.inOutRange.duration().value() > 0.0)
             {
                 // Outside, faded towards the background: left out of

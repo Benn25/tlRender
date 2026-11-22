@@ -172,6 +172,13 @@ namespace tl
             //! is the same file, reloaded or not.
             TL_UI_API void setTimeMarks(const std::vector<TimeMark>&);
 
+            //! Mark the holes in the media: ranges with no frame of their
+            //! own, a frame held over them. Drawn over the tracks dimmed and
+            //! striped light and dark, so a hole shows whatever the frames
+            //! held look like, black, white or a flat color. Kept while the
+            //! player is the same file.
+            TL_UI_API void setHoles(const std::vector<OTIO_NS::TimeRange>&);
+
             ///@}
 
             //! \name Item Colors
